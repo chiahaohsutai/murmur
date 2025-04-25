@@ -1,0 +1,4 @@
+**/target
+ggml-large-v3-turbo.bin
+.DS_Store
+.env

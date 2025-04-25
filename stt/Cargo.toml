@@ -1,0 +1,10 @@
+[package]
+name = "stt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dotenv = "0.15.0"
+hound = "3.5.1"
+tracing = "0.1.41"
+whisper-rs = { version = "0.14.2", features = ["metal", "tracing_backend"]}
