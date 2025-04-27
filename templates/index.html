@@ -9,26 +9,24 @@
     <p>Click <b>Transcribe</b> to start a transcription</p>
   </div>
   <div class="flex flex-nowrap w-full gap-2 justify-center">
-    <button class="flex-1 max-w-2xs bg-blue-400 p-2 rounded-lg text-white">
+    <button
+      id="start"
+      class="flex-1 max-w-2xs bg-blue-400 p-2 rounded-lg text-white hover:opacity-75 active:opacity-50"
+    >
       Transcribe
     </button>
-    <button class="flex-1 max-w-2xs bg-blue-400 p-2 rounded-lg text-white">
+    <button
+      id="stop"
+      class="flex-1 max-w-2xs bg-blue-400 p-2 rounded-lg text-white hover:opacity-75 active:opacity-50"
+    >
       Stop
     </button>
   </div>
-  <div class="w-[80%]" ws-connect="/ws">
+  <div class="w-[80%]">
     <div
       class="min-h-[200px] max-h-[200px] rounded-lg bg-gray-200 p-4"
       id="transcription"
     ></div>
-    <form ws-send>
-      <input name="message" class="border-1" type="text" />
-      <input
-        type="submit"
-        value="Send"
-        class="cursor-pointer hover:opacity-75 active:opacity-50"
-      />
-    </form>
   </div>
 </div>
 {% endblock ~%}

@@ -22,16 +22,14 @@ pub async fn ws(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, 
     let (res, mut sess, stream) = actix_ws::handle(&req, stream)?;
     let mut stream = stream.aggregate_continuations();
 
-    tracing::info!("Upgrading the socket connection.");
+    tracing::info!("Connection request. Upgrading the socket connection.");
 
     rt::spawn(async move {
         while let Some(msg) = stream.next().await {
             match msg {
                 Ok(AggregatedMessage::Text(text)) => {
                     tracing::debug!("Reveived a Bytestring");
-                    let msg =
-                        format!(r#"<span id="transcription" hx-swap-oob="beforeend">Hola </span>"#);
-                    sess.text(msg).await.unwrap();
+                    sess.text("Hello").await.unwrap();
                 }
                 Ok(AggregatedMessage::Binary(bin)) => {
                     tracing::debug!("Reveived bytes");
