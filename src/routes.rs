@@ -29,7 +29,8 @@ pub async fn ws(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, 
             match msg {
                 Ok(AggregatedMessage::Text(text)) => {
                     tracing::debug!("Reveived a Bytestring");
-                    let msg = format!(r#"<span id="transcription" hx-swap-oob="beforeend">Hola </span>"#);
+                    let msg =
+                        format!(r#"<span id="transcription" hx-swap-oob="beforeend">Hola </span>"#);
                     sess.text(msg).await.unwrap();
                 }
                 Ok(AggregatedMessage::Binary(bin)) => {
