@@ -1,0 +1,17 @@
+[package]
+name = "Murmur"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dotenv = "0.15.0"
+hound = "3.5.1"
+tracing = "0.1.41"
+whisper-rs = { version = "0.14.2", features = ["metal", "tracing_backend"]}
+actix-web = "4"
+actix-ws = "0.3.0"
+futures-util = "0.3.31"
+askama = "0.14.0"
+actix-files = "0.6.6"
+tracing-subscriber = { version = "0.3.19", features = ["json", "env-filter"] }
+tracing-actix-web = "0.7.18"

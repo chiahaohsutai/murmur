@@ -1,9 +1,7 @@
-use tracing::instrument;
 use whisper_rs::{
     FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
 };
 
-#[instrument]
 pub fn create_stt_model(path: String) -> Result<WhisperContext, String> {
     let mut config = WhisperContextParameters::new();
     config.use_gpu(true).flash_attn(true).gpu_device(0);
@@ -13,7 +11,6 @@ pub fn create_stt_model(path: String) -> Result<WhisperContext, String> {
     }
 }
 
-#[instrument]
 fn run_stt_model(mut state: WhisperState) -> Result<String, String> {
     let strategy = SamplingStrategy::Greedy { best_of: 1 };
     let mut params = FullParams::new(strategy);
