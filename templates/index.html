@@ -1,0 +1,31 @@
+{% extends "layout.html" %}{%~ block content %}
+<div class="flex w-full justify-center items-center flex-col gap-3">
+  <h1 class="text-3xl"><b>MurmurRS</b></h1>
+  <div class="text-center">
+    <p>
+      Simple browser based transcription using OpenAI's
+      <span class="text-gray-500"><b>Whisper</b></span>
+    </p>
+    <p>Click <b>Transcribe</b> to start a transcription</p>
+  </div>
+  <div class="flex flex-nowrap w-full gap-2 justify-center">
+    <button class="flex-1 max-w-2xs bg-blue-400 p-2 rounded-lg text-white">
+      Transcribe
+    </button>
+    <button class="flex-1 max-w-2xs bg-blue-400 p-2 rounded-lg text-white">
+      Stop
+    </button>
+  </div>
+  <div class="w-[80%]" ws-connect="/ws">
+    <div class="min-h-[200px] max-h-[200px] rounded-lg bg-gray-200 p-4" id="transcription"></div>
+    <form ws-send>
+      <input name="message" class="border-1" type="text" />
+      <input
+        type="submit"
+        value="Send"
+        class="cursor-pointer hover:opacity-75 active:opacity-50"
+      />
+    </form>
+  </div>
+</div>
+{% endblock ~%}
