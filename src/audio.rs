@@ -16,7 +16,7 @@ fn run_stt_model(mut state: WhisperState) -> Result<String, String> {
     let mut params = FullParams::new(strategy);
     params.set_print_progress(false);
     params.set_print_timestamps(false);
-    
+
     let result = state.full(params, &[0.0; 10]);
     match result {
         Err(err) => Err(format!("Failed to transcribe: {}", err)),

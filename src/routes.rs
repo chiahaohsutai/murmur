@@ -1,8 +1,15 @@
+use std::error::Error;
+use std::fs::read;
+
 use actix_web::web::{self, Html};
 use actix_web::{HttpRequest, HttpResponse, Responder, get, rt};
 use actix_ws::AggregatedMessage;
 use askama::Template;
 use futures_util::StreamExt as _;
+use symphonia::core::formats::FormatReader;
+use symphonia::default::codecs::PcmDecoder;
+use symphonia::default::formats::MkvReader;
+use symphonia::core::io::MediaSourceStream;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -27,17 +34,10 @@ pub async fn ws(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, 
     rt::spawn(async move {
         while let Some(msg) = stream.next().await {
             match msg {
-                Ok(AggregatedMessage::Text(text)) => {
-                    tracing::debug!("Reveived a Bytestring");
-                    sess.text("Hello").await.unwrap();
-                }
                 Ok(AggregatedMessage::Binary(bin)) => {
                     tracing::debug!("Reveived bytes");
+                    print!("{:?}", bin);
                     sess.binary(bin).await.unwrap();
-                }
-                Ok(AggregatedMessage::Ping(msg)) => {
-                    tracing::debug!("Reveived a pong");
-                    sess.pong(&msg).await.unwrap();
                 }
                 _ => {}
             }
@@ -46,4 +46,15 @@ pub async fn ws(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, 
         // let _ = sess.close(None).await;
     });
     Ok(res)
+}
+
+fn demux_audio(data: actix_web::web::Bytes) -> Result<(), String>{
+    let cursor = Box::new(std::io::Cursor::new(data));
+    let mss = MediaSourceStream::new(cursor, Default::default());
+    let reader = match MkvReader::try_new(mss, &Default::default()) {
+        Ok(reader) => reader,
+        Err(err) => return Err(format!("Invalid audio format: {err}"))
+    };
+    let track = reader.default_track();
+    Ok(())
 }
