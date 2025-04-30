@@ -11,7 +11,7 @@ pub fn create_stt_model(path: String) -> Result<WhisperContext, String> {
     }
 }
 
-fn run_stt_model(mut state: WhisperState) -> Result<String, String> {
+pub fn run_stt_model(mut state: WhisperState) -> Result<String, String> {
     let strategy = SamplingStrategy::Greedy { best_of: 1 };
     let mut params = FullParams::new(strategy);
     params.set_print_progress(false);
