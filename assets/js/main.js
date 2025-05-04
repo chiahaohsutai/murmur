@@ -2,7 +2,7 @@ const startBtn = document.querySelector("#start");
 const stopBtn = document.querySelector("#stop");
 const transcription = document.querySelector("#transcription");
 
-let audioCtx, ws, workletNode, ms, sendInterval;
+let audioCtx, ws, workletNode, mms, smm, sendInterval;
 let recording = false;
 
 function float32ToBytes(float32) {
@@ -21,8 +21,15 @@ async function startRecording(interval = 5000) {
   audioCtx = new AudioContext({ sampleRate: 48000 });
   await audioCtx.audioWorklet.addModule("/assets/js/processor.js");
 
-  ms = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const source = audioCtx.createMediaStreamSource(ms);
+  mms = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const micSource = audioCtx.createMediaStreamSource(mms);
+
+  smm = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  const sysSource = audioCtx.createMediaStreamSource(smm);
+
+  const merger = audioCtx.createChannelMerger(1);
+  micSource.connect(merger, 0, 0);
+  sysSource.connect(merger, 0, 0);
 
   let audioBuffer = [];
 
@@ -43,12 +50,12 @@ async function startRecording(interval = 5000) {
     }
   }, interval)
 
-  source.connect(workletNode).connect(audioCtx.destination);
+  merger.connect(workletNode).connect(audioCtx.destination);
 }
 
 async function stopRecording() {
   if (workletNode) workletNode.port.close();
-  if (ms) ms.getTracks().forEach((track) => track.stop());
+  if (mms) mms.getTracks().forEach((track) => track.stop());
   if (audioCtx) audioCtx.close();
   if (ws) ws.close();
   if (sendInterval) clearInterval(sendInterval);
@@ -58,9 +65,10 @@ startBtn.addEventListener("click", async () => {
   if (!recording) {
     recording = true;
     startBtn.innerText = "Listening...";
+    startBtn.classList.add("animate-pulse");
     startBtn.disabled = true;
     stopBtn.disabled = false;
-    await startRecording();
+    await startRecording(10000);
     ws.onmessage = (e) => {
       console.log(JSON.stringify(e, null, 2));
       const contents = transcription.textContent ?? "";
@@ -73,6 +81,8 @@ stopBtn.addEventListener("click", async () => {
   if (recording) {
     recording = false;
     startBtn.disabled = false;
+    startBtn.innerText = "Transcribe";
+    startBtn.classList.remove("animate-pulse");
     stopBtn.disabled = true;
     await stopRecording();
   }
