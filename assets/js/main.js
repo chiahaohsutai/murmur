@@ -38,7 +38,7 @@ async function startRecording(interval = 5000) {
         merged.set(chunk, offset);
         offset += chunk.length;
       }
-      // ws.send(float32ToBytes(merged));
+      ws.send(float32ToBytes(merged));
       audioBuffer = [];
     }
   }, interval)
