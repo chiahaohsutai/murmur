@@ -12,6 +12,7 @@ pub fn create_stt_model(path: String) -> Result<WhisperContext, String> {
 }
 
 pub fn run_stt_model(state: &mut WhisperState, data: Vec<f32>) -> Result<String, String> {
+    tracing::info!("Running inference session.");
     let strategy = SamplingStrategy::Greedy { best_of: 1 };
     let mut params = FullParams::new(strategy);
     params.set_print_progress(false);
@@ -21,13 +22,16 @@ pub fn run_stt_model(state: &mut WhisperState, data: Vec<f32>) -> Result<String,
     match result {
         Err(err) => Err(format!("Failed to transcribe: {}", err)),
         Ok(_) => {
+            tracing::info!("Succesful transcription.");
             if let Ok(n) = state.full_n_segments() {
+                tracing::info!("Retrieving text segments from session.");
                 let texts = (0..n).map(|i| {
                     let segment = state.full_get_segment_text(i).unwrap_or(String::from(""));
                     String::from(segment.trim())
                 });
                 Ok(texts.fold(String::from(""), |acc, s| format!("{acc} {s}")))
             } else {
+                tracing::error!("Failed to fetch segments from model.");
                 Err(String::from("Failed to fetch segments"))
             }
         }

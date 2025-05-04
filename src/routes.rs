@@ -1,16 +1,10 @@
 use crate::audio::run_stt_model;
 use crate::state::AppState;
-use actix_web::web::{self, Html};
+use actix_web::web::{self, Bytes, Html};
 use actix_web::{HttpRequest, HttpResponse, Responder, get, rt};
 use actix_ws::AggregatedMessage;
 use askama::Template;
 use futures_util::StreamExt as _;
-use symphonia::core::audio::SampleBuffer;
-use symphonia::core::errors::Error::DecodeError;
-use symphonia::core::formats::FormatReader;
-use symphonia::core::io::MediaSourceStream;
-use symphonia::default::formats::MkvReader;
-use symphonia::default::get_codecs;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -33,7 +27,6 @@ pub async fn ws(
 ) -> Result<HttpResponse, actix_web::Error> {
     let (res, mut sess, stream) = actix_ws::handle(&req, stream)?;
     let mut stream = stream.aggregate_continuations();
-
     tracing::info!("Connection request. Upgrading the socket connection.");
 
     rt::spawn(async move {
@@ -41,6 +34,7 @@ pub async fn ws(
         while let Some(msg) = stream.next().await {
             let mut max_retries = 3;
             while let Err(err) = whisper_state {
+                tracing::error!("Failed to create inference session. Retrying ...");
                 if max_retries == 0 {
                     tracing::error!("Failed to start a inference session: {err}");
                     break;
@@ -53,21 +47,17 @@ pub async fn ws(
             }
             match msg {
                 Ok(AggregatedMessage::Binary(bin)) => {
-                    let audio = decode_audio_to_f32(bin);
-                    if let Ok(audio) = audio {
-                        let state = whisper_state.as_mut().unwrap();
-                        let text = run_stt_model(state, audio);
-                        if let Err(err) = text {
-                            tracing::error!("Failed to transcribe: {:?}", err)
-                        } else {
-                            let text = text.unwrap();
+                    tracing::info!("Received Message");
+                    let audio = bytes_to_f32_vec(bin);
+                    let state = whisper_state.as_mut().unwrap();
+                    match run_stt_model(state, audio) {
+                        Ok(text) => {
                             if let Err(err) = sess.text(text).await {
-                                tracing::error!("Failed to text text: {:?}", err)
+                                tracing::error!("Failed to send data to client: {err}")
                             }
                         }
-                    } else {
-                        if let Err(err) = sess.text("").await {
-                            tracing::error!("Failed to send text: {:?}", err);
+                        Err(err) => {
+                            tracing::error!("Failed to transcribe audio: {err}")
                         }
                     }
                 }
@@ -80,54 +70,14 @@ pub async fn ws(
     Ok(res)
 }
 
-fn decode_audio_to_f32(data: actix_web::web::Bytes) -> Result<Vec<f32>, String> {
-    let cursor = Box::new(std::io::Cursor::new(data));
+fn bytes_to_f32_vec(bytes: Bytes) -> Vec<f32> {
+    let data = bytes.as_ref();
+    assert!(data.len() % 4 == 0, "Byte length must be divisible by 4");
 
-    let mss = MediaSourceStream::new(cursor, Default::default());
-    let mut reader = match MkvReader::try_new(mss, &Default::default()) {
-        Ok(reader) => reader,
-        Err(err) => return Err(format!("Invalid audio format: {err}")),
-    };
-
-    let track = match reader.default_track() {
-        Some(track) => track,
-        None => return Err(format!("No audio track was found.")),
-    };
-    let track_id = track.id;
-
-    let mut decoder = match get_codecs().make(&track.codec_params, &Default::default()) {
-        Ok(decoder) => decoder,
-        Err(err) => return Err(format!("Unsupported audio encoding: {err}.")),
-    };
-
-    let mut buffer = None;
-    let mut audio: Vec<f32> = vec![];
-
-    loop {
-        let packet = reader.next_packet();
-        if let Err(err) = packet {
-            return Err(format!("Failed to read audio packet: {err}"));
-        }
-        let packet = packet.unwrap();
-        if packet.track_id() != track_id {
-            continue;
-        }
-        match decoder.decode(&packet) {
-            Ok(audio_buf) => {
-                if buffer.is_none() {
-                    let duration = audio_buf.capacity() as u64;
-                    let spec = *audio_buf.spec();
-                    buffer = Some(SampleBuffer::new(duration, spec))
-                }
-                if let Some(buf) = &mut buffer {
-                    buf.copy_interleaved_ref(audio_buf);
-                    let samples: &[f32] = buf.samples();
-                    samples.iter().for_each(|sample| audio.push(*sample));
-                }
-            }
-            Err(DecodeError(_)) => (),
-            Err(_) => break,
-        }
-    }
-    Ok(audio)
+    data.chunks_exact(4)
+        .map(|chunk| {
+            let array: [u8; 4] = chunk.try_into().unwrap();
+            f32::from_le_bytes(array)
+        })
+        .collect()
 }

@@ -54,12 +54,17 @@ async fn main() -> std::io::Result<()> {
     };
     let whisper = Arc::new(ctx);
 
-    tracing::info!("Starting server at http://127.0.0.1:8080");
+    tracing::info!("Starting server at http://127.0.0.1:8080.");
     let server = HttpServer::new(move || {
         App::new()
             .wrap(tracing_actix_web::TracingLogger::default())
             .app_data(web::Data::new(state::AppState::new(Arc::clone(&whisper))))
-            .service(fs::Files::new("/assets", "./assets").show_files_listing())
+            .service(
+                fs::Files::new("/assets", "./assets")
+                    .prefer_utf8(true)
+                    .disable_content_disposition()
+                    .show_files_listing(),
+            )
             .service(index)
             .service(ws)
     })
