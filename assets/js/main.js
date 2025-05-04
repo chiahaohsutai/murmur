@@ -56,6 +56,7 @@ async function startRecording(interval = 5000) {
 async function stopRecording() {
   if (workletNode) workletNode.port.close();
   if (mms) mms.getTracks().forEach((track) => track.stop());
+  if (smm) smm.getTracks().forEach((track) => track.stop());
   if (audioCtx) audioCtx.close();
   if (ws) ws.close();
   if (sendInterval) clearInterval(sendInterval);
