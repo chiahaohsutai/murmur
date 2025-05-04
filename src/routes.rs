@@ -1,3 +1,5 @@
+use crate::audio::run_stt_model;
+use crate::state::AppState;
 use actix_web::web::{self, Html};
 use actix_web::{HttpRequest, HttpResponse, Responder, get, rt};
 use actix_ws::AggregatedMessage;
@@ -9,7 +11,6 @@ use symphonia::core::formats::FormatReader;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::default::formats::MkvReader;
 use symphonia::default::get_codecs;
-use crate::audio::run_stt_model;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -25,25 +26,56 @@ pub async fn index() -> impl Responder {
 }
 
 #[get("/ws")]
-pub async fn ws(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, actix_web::Error> {
+pub async fn ws(
+    req: HttpRequest,
+    stream: web::Payload,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, actix_web::Error> {
     let (res, mut sess, stream) = actix_ws::handle(&req, stream)?;
     let mut stream = stream.aggregate_continuations();
 
     tracing::info!("Connection request. Upgrading the socket connection.");
 
     rt::spawn(async move {
+        let mut whisper_state = data.state();
         while let Some(msg) = stream.next().await {
+            let mut max_retries = 3;
+            while let Err(err) = whisper_state {
+                if max_retries == 0 {
+                    tracing::error!("Failed to start a inference session: {err}");
+                    break;
+                }
+                whisper_state = data.state();
+                max_retries -= 1;
+            }
+            if whisper_state.is_err() {
+                continue;
+            }
             match msg {
                 Ok(AggregatedMessage::Binary(bin)) => {
-                    // let audio = decode_audio_to_f32(bin);
-                    // let text = run_stt_model();
-                    sess.binary(bin).await.unwrap();
+                    let audio = decode_audio_to_f32(bin);
+                    if let Ok(audio) = audio {
+                        let state = whisper_state.as_mut().unwrap();
+                        let text = run_stt_model(state, audio);
+                        if let Err(err) = text {
+                            tracing::error!("Failed to transcribe: {:?}", err)
+                        } else {
+                            let text = text.unwrap();
+                            if let Err(err) = sess.text(text).await {
+                                tracing::error!("Failed to text text: {:?}", err)
+                            }
+                        }
+                    } else {
+                        if let Err(err) = sess.text("").await {
+                            tracing::error!("Failed to send text: {:?}", err);
+                        }
+                    }
                 }
                 _ => {}
             }
         }
-        tracing::info!("Closing the socket connection.")
-        // let _ = sess.close(None).await;
+        tracing::info!("Closing the socket connection.");
+        let _ = sess.close(None).await;
     });
     Ok(res)
 }
@@ -94,7 +126,7 @@ fn decode_audio_to_f32(data: actix_web::web::Bytes) -> Result<Vec<f32>, String> 
                 }
             }
             Err(DecodeError(_)) => (),
-            Err(_) => break
+            Err(_) => break,
         }
     }
     Ok(audio)

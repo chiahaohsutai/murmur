@@ -11,13 +11,13 @@ pub fn create_stt_model(path: String) -> Result<WhisperContext, String> {
     }
 }
 
-pub fn run_stt_model(mut state: WhisperState) -> Result<String, String> {
+pub fn run_stt_model(state: &mut WhisperState, data: Vec<f32>) -> Result<String, String> {
     let strategy = SamplingStrategy::Greedy { best_of: 1 };
     let mut params = FullParams::new(strategy);
     params.set_print_progress(false);
     params.set_print_timestamps(false);
 
-    let result = state.full(params, &[0.0; 10]);
+    let result = state.full(params, &data);
     match result {
         Err(err) => Err(format!("Failed to transcribe: {}", err)),
         Ok(_) => {

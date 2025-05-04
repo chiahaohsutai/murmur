@@ -1,7 +1,8 @@
 use actix_files as fs;
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpServer, web};
 use dotenv::dotenv;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
@@ -9,6 +10,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 mod audio;
 mod routes;
+mod state;
 
 use audio::create_stt_model;
 use routes::{index, ws};
@@ -37,7 +39,7 @@ async fn main() -> std::io::Result<()> {
     let socket = SocketAddr::new(ip, port);
 
     tracing::info!("Creating Whisper context.");
-    let _ctx = match std::env::var("STT_MODEL_PATH") {
+    let ctx = match std::env::var("STT_MODEL_PATH") {
         Ok(path) => match create_stt_model(path) {
             Ok(context) => context,
             Err(err) => {
@@ -50,11 +52,13 @@ async fn main() -> std::io::Result<()> {
             std::process::exit(1);
         }
     };
+    let whisper = Arc::new(ctx);
 
     tracing::info!("Starting server at http://127.0.0.1:8080");
-    let server = HttpServer::new(|| {
+    let server = HttpServer::new(move || {
         App::new()
             .wrap(tracing_actix_web::TracingLogger::default())
+            .app_data(web::Data::new(state::AppState::new(Arc::clone(&whisper))))
             .service(fs::Files::new("/assets", "./assets").show_files_listing())
             .service(index)
             .service(ws)
